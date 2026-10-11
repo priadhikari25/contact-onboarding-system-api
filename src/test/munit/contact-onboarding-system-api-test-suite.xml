@@ -1,0 +1,537 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule
+    xmlns="http://www.mulesoft.org/schema/mule/core"
+    xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:munit="http://www.mulesoft.org/schema/mule/munit"
+    xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+    xmlns:db="http://www.mulesoft.org/schema/mule/db"
+    xmlns:amqp="http://www.mulesoft.org/schema/mule/amqp"
+    xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd 
+        http://www.mulesoft.org/schema/mule/core
+        http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+
+        http://www.mulesoft.org/schema/mule/munit
+        http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+
+        http://www.mulesoft.org/schema/mule/munit-tools
+        http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit-tools.xsd
+
+        http://www.mulesoft.org/schema/mule/db
+        http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+
+        http://www.mulesoft.org/schema/mule/amqp
+        http://www.mulesoft.org/schema/mule/amqp/current/mule-amqp.xsd">
+
+    <munit:config name="munit"/>
+
+     <munit:test
+    name="testDatabaseUpdate"
+    description="Update an existing Contact record">
+
+    <munit:behavior>
+
+        <munit-tools:mock-when processor="db:select">
+
+            <munit-tools:then-return>
+
+                <munit-tools:payload
+                    value='#[[
+                        {
+                            contact_sf_id: "003TEST"
+                        }
+                    ]]'
+                    mediaType="application/java"/>
+
+                <munit-tools:variables>
+
+                    <munit-tools:variable
+                        key="existingContact"
+                        value='#[[
+                            {
+                                contact_sf_id: "003TEST"
+                            }
+                        ]]'
+                        mediaType="application/java"/>
+
+                </munit-tools:variables>
+
+            </munit-tools:then-return>
+
+        </munit-tools:mock-when>
+
+        <munit-tools:mock-when processor="db:update">
+
+            <munit-tools:then-return>
+
+                <munit-tools:payload
+                    value="#[1]"
+                    mediaType="application/java"/>
+
+            </munit-tools:then-return>
+
+        </munit-tools:mock-when>
+
+    </munit:behavior>
+
+    <munit:execution>
+
+        <munit:set-event doc:name="Set Existing Contact Payload">
+
+            <munit:payload
+                value='#[{
+                    contact_sf_id: "003TEST",
+                    first_name: "Priya",
+                    last_name: "Adhikari",
+                    email: "priya.adhikari@test.com",
+                    phone: "9876543210",
+                    account_id: "001TEST",
+                    job_title: "Technical Trainee",
+                    department: "Technology",
+                    reports_to_id: null,
+                    account_name: "Microsoft",
+                    account_industry: "Technology",
+                    account_type: "Customer - Direct",
+                    account_revenue: 15000000,
+                    account_contact_count: 4,
+                    contact_priority: "HIGH",
+                    modified_date: "2026-10-11 10:33:15"
+                }]'
+                mediaType="application/java"/>
+
+            <munit:variables>
+
+                <munit:variable
+                    key="messageCorrelationId"
+                    value="#['TEST-CORRELATION-UPDATE']"
+                    mediaType="application/java"/>
+
+            </munit:variables>
+
+        </munit:set-event>
+
+        <flow-ref
+            name="contact-database-upsert-subflow"
+            doc:name="Execute Database Update"/>
+
+    </munit:execution>
+
+    <munit:validation>
+
+        <munit-tools:verify-call
+            processor="db:select"
+            times="1"/>
+
+        <munit-tools:verify-call
+            processor="db:update"
+            times="1"/>
+
+        <munit-tools:verify-call
+            processor="db:insert"
+            times="0"/>
+
+        <munit-tools:assert-that
+            expression="#[vars.existingContact]"
+            is="#[MunitTools::notNullValue()]"
+            message="Existing Contact result was not populated."/>
+
+    </munit:validation>
+
+</munit:test>
+
+    <munit:test
+        name="testDatabaseInsert"
+        description="Insert a new Contact record">
+
+        <munit:behavior>
+
+            <munit-tools:mock-when processor="db:select">
+                <munit-tools:then-return>
+                    <munit-tools:payload
+                        value="#[[]]"
+                        mediaType="application/java"/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+
+            <munit-tools:mock-when processor="db:insert">
+                <munit-tools:then-return>
+                    <munit-tools:payload
+                        value="#[1]"
+                        mediaType="application/java"/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
+
+        </munit:behavior>
+
+        <munit:execution>
+
+            <munit:set-event doc:name="Set New Contact Payload">
+
+                <munit:payload
+                    value='#[{
+                        contact_sf_id: "003NEW",
+                        first_name: "Priya",
+                        last_name: "Adhikari",
+                        email: "priya.adhikari@test.com",
+                        phone: "9876543210",
+                        account_id: "001TEST",
+                        job_title: "Technical Trainee",
+                        department: "Technology",
+                        reports_to_id: null,
+                        account_name: "Microsoft",
+                        account_industry: "Technology",
+                        account_type: "Customer - Direct",
+                        account_revenue: 15000000,
+                        account_contact_count: 4,
+                        contact_priority: "HIGH",
+                        modified_date: "2026-10-11 10:33:15"
+                    }]'
+                    mediaType="application/java"/>
+
+                <munit:variables>
+
+                    <munit:variable
+                        key="messageCorrelationId"
+                        value="#['TEST-CORRELATION-INSERT']"
+                        mediaType="application/java"/>
+
+                </munit:variables>
+
+            </munit:set-event>
+
+            <flow-ref
+                name="contact-database-upsert-subflow"
+                doc:name="Execute Database Insert"/>
+
+        </munit:execution>
+
+        <munit:validation>
+
+            <munit-tools:verify-call
+                processor="db:select"
+                times="1"/>
+
+            <munit-tools:verify-call
+                processor="db:insert"
+                times="1"/>
+
+            <munit-tools:verify-call
+                processor="db:update"
+                times="0"/>
+
+        </munit:validation>
+
+    </munit:test>
+
+    <munit:test
+        name="testValidationFailure"
+        description="Validate rejection of an invalid Contact message"
+        expectedErrorType="VALIDATION:VALIDATION">
+
+        <munit:execution>
+
+            <munit:set-event doc:name="Set Invalid Contact Payload">
+
+                <munit:payload
+                    value='#[{
+                        contact_sf_id: null,
+                        first_name: "Priya",
+                        last_name: "Adhikari",
+                        email: null,
+                        phone: "9876543210",
+                        account_id: null,
+                        job_title: "Technical Trainee",
+                        department: "Technology",
+                        reports_to_id: null,
+                        account_name: "Microsoft",
+                        account_industry: "Technology",
+                        account_type: "Customer - Direct",
+                        account_revenue: 15000000,
+                        account_contact_count: 4,
+                        contact_priority: "HIGH",
+                        modified_date: "2026-10-11 10:33:15"
+                    }]'
+                    mediaType="application/java"/>
+
+            </munit:set-event>
+
+            <flow-ref
+                name="contact-onboarding-message-validation-subflow"
+                doc:name="Execute Message Validation"/>
+
+        </munit:execution>
+
+    </munit:test>
+
+    <munit:test
+        name="testAckAfterSuccess"
+        description="Acknowledge RabbitMQ message after database success">
+
+        <munit:behavior>
+
+            <munit-tools:mock-when processor="flow-ref">
+
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute
+                        attributeName="name"
+                        whereValue="#['contact-onboarding-message-validation-subflow']"/>
+                </munit-tools:with-attributes>
+
+            </munit-tools:mock-when>
+
+            <munit-tools:mock-when processor="flow-ref">
+
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute
+                        attributeName="name"
+                        whereValue="#['contact-database-payload-builder-subflow']"/>
+                </munit-tools:with-attributes>
+
+                <munit-tools:then-return>
+
+                    <munit-tools:payload
+                        value='#[{
+                            contact_sf_id: "003ACK",
+                            first_name: "Priya",
+                            last_name: "Adhikari",
+                            email: "priya.adhikari@test.com",
+                            phone: "9876543210",
+                            account_id: "001TEST",
+                            job_title: "Technical Trainee",
+                            department: "Technology",
+                            reports_to_id: null,
+                            account_name: "Microsoft",
+                            account_industry: "Technology",
+                            account_type: "Customer - Direct",
+                            account_revenue: 15000000,
+                            account_contact_count: 4,
+                            contact_priority: "HIGH",
+                            modified_date: "2026-10-11 10:33:15"
+                        }]'
+                        mediaType="application/java"/>
+
+                    <munit-tools:variables>
+
+                        <munit-tools:variable
+                            key="dbPayload"
+                            value='#[{
+                                contact_sf_id: "003ACK"
+                            }]'
+                            mediaType="application/java"/>
+
+                    </munit-tools:variables>
+
+                </munit-tools:then-return>
+
+            </munit-tools:mock-when>
+
+            <munit-tools:mock-when processor="flow-ref">
+
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute
+                        attributeName="name"
+                        whereValue="#['contact-database-upsert-subflow']"/>
+                </munit-tools:with-attributes>
+
+            </munit-tools:mock-when>
+
+            <munit-tools:mock-when processor="amqp:ack"/>
+
+            <munit-tools:mock-when processor="amqp:reject"/>
+
+        </munit:behavior>
+
+        <munit:execution>
+
+            <munit:set-event doc:name="Set Valid RabbitMQ Message">
+
+                <munit:payload
+                    value='#[{
+                        contact_sf_id: "003ACK",
+                        first_name: "Priya",
+                        last_name: "Adhikari",
+                        email: "priya.adhikari@test.com",
+                        phone: "9876543210",
+                        account_id: "001TEST",
+                        job_title: "Technical Trainee",
+                        department: "Technology",
+                        reports_to_id: null,
+                        reports_to_name: "Unassigned",
+                        account_name: "Microsoft",
+                        account_industry: "Technology",
+                        account_type: "Customer - Direct",
+                        account_revenue: 15000000,
+                        account_contact_count: 4,
+                        contact_priority: "HIGH",
+                        modified_date: "2026-10-11 10:33:15"
+                    }]'
+                    mediaType="application/java"/>
+
+                <munit:attributes
+                    value='#[{
+                        ackId: "ACK-001"
+                    }]'
+                    mediaType="application/java"/>
+
+            </munit:set-event>
+
+            <flow-ref
+                name="contact-onboarding-message-consumer-flow"
+                doc:name="Execute Contact Onboarding Consumer"/>
+
+        </munit:execution>
+
+        <munit:validation>
+
+            <munit-tools:verify-call
+                processor="amqp:ack"
+                times="1"/>
+
+            <munit-tools:verify-call
+                processor="amqp:reject"
+                times="0"/>
+
+        </munit:validation>
+
+    </munit:test>
+
+  
+
+<munit:test
+    name="testDatabaseFailureRequeue"
+    description="Reject and requeue after database retry exhaustion">
+
+    <munit:behavior>
+
+        <munit-tools:mock-when processor="flow-ref">
+
+            <munit-tools:with-attributes>
+
+                <munit-tools:with-attribute
+                    attributeName="name"
+                    whereValue="#['contact-onboarding-message-validation-subflow']"/>
+
+            </munit-tools:with-attributes>
+
+        </munit-tools:mock-when>
+
+        <munit-tools:mock-when processor="flow-ref">
+
+            <munit-tools:with-attributes>
+
+                <munit-tools:with-attribute
+                    attributeName="name"
+                    whereValue="#['contact-database-payload-builder-subflow']"/>
+
+            </munit-tools:with-attributes>
+
+            <munit-tools:then-return>
+
+                <munit-tools:payload
+                    value='#[{
+                        contact_sf_id: "003FAIL",
+                        first_name: "Priya",
+                        last_name: "Adhikari",
+                        email: "priya.adhikari@test.com",
+                        phone: "9876543210",
+                        account_id: "001TEST",
+                        job_title: "Technical Trainee",
+                        department: "Technology",
+                        reports_to_id: null,
+                        reports_to_name: "Unassigned",
+                        account_name: "Microsoft",
+                        account_industry: "Technology",
+                        account_type: "Customer - Direct",
+                        account_revenue: 15000000,
+                        account_contact_count: 4,
+                        contact_priority: "HIGH",
+                        modified_date: "2026-10-11 10:33:15"
+                    }]'
+                    mediaType="application/java"/>
+
+            </munit-tools:then-return>
+
+        </munit-tools:mock-when>
+
+        <munit-tools:mock-when processor="flow-ref">
+
+            <munit-tools:with-attributes>
+
+                <munit-tools:with-attribute
+                    attributeName="name"
+                    whereValue="#['contact-database-upsert-subflow']"/>
+
+            </munit-tools:with-attributes>
+
+            <munit-tools:then-return>
+
+                <munit-tools:error
+                    typeId="MULE:RETRY_EXHAUSTED"/>
+
+            </munit-tools:then-return>
+
+        </munit-tools:mock-when>
+
+        <munit-tools:mock-when processor="amqp:ack"/>
+
+        <munit-tools:mock-when processor="amqp:reject"/>
+
+    </munit:behavior>
+
+    <munit:execution>
+
+        <munit:set-event doc:name="Set Database Failure Message">
+
+            <munit:payload
+                value='#[{
+                    contact_sf_id: "003FAIL",
+                    first_name: "Priya",
+                    last_name: "Adhikari",
+                    email: "priya.adhikari@test.com",
+                    phone: "9876543210",
+                    account_id: "001TEST",
+                    job_title: "Technical Trainee",
+                    department: "Technology",
+                    reports_to_id: null,
+                    reports_to_name: "Unassigned",
+                    account_name: "Microsoft",
+                    account_industry: "Technology",
+                    account_type: "Customer - Direct",
+                    account_revenue: 15000000,
+                    account_contact_count: 4,
+                    contact_priority: "HIGH",
+                    modified_date: "2026-10-11 10:33:15"
+                }]'
+                mediaType="application/java"/>
+
+            <munit:attributes
+                value='#[{
+                    ackId: "ACK-FAIL"
+                }]'
+                mediaType="application/java"/>
+
+        </munit:set-event>
+
+        <flow-ref
+            name="contact-onboarding-message-consumer-flow"
+            doc:name="Execute Database Failure Path"/>
+
+    </munit:execution>
+
+    <munit:validation>
+
+        <munit-tools:verify-call
+            processor="amqp:ack"
+            times="0"/>
+
+        <munit-tools:verify-call
+            processor="amqp:reject"
+            times="1"/>
+
+    </munit:validation>
+
+</munit:test>
+
+</mule>
