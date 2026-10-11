@@ -1,0 +1,277 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule
+    xmlns="http://www.mulesoft.org/schema/mule/core"
+    xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+    xmlns:db="http://www.mulesoft.org/schema/mule/db"
+    xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd 
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd 
+        http://www.mulesoft.org/schema/mule/core
+        http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+
+        http://www.mulesoft.org/schema/mule/ee/core
+        http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+
+        http://www.mulesoft.org/schema/mule/db
+        http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd">
+
+    <sub-flow
+            name="contact-database-payload-builder-subflow"
+            doc:id="cf98cd2b-1714-42b2-9b62-9b048eed0ee7">
+
+        <ee:transform
+                doc:name="Build Contact Onboarding Database Payload"
+                doc:id="4116d9ee-6c15-4f92-b657-06b527a78014">
+
+            <ee:message>
+
+                <ee:set-payload><![CDATA[
+%dw 2.0
+output application/java
+---
+{
+    contact_sf_id:
+        payload.contact_sf_id,
+
+    first_name:
+        payload.first_name,
+
+    last_name:
+        payload.last_name,
+
+    email:
+        payload.email,
+
+    phone:
+        payload.phone,
+
+    account_id:
+        payload.account_id,
+
+    job_title:
+        payload.job_title,
+
+    department:
+        payload.department,
+
+    reports_to_id:
+        payload.reports_to_id,
+
+    account_name:
+        payload.account_name,
+
+    account_industry:
+        payload.account_industry,
+
+    account_type:
+        payload.account_type,
+
+    account_revenue:
+        payload.account_revenue,
+
+    account_contact_count:
+        payload.account_contact_count,
+
+    contact_priority:
+        payload.contact_priority,
+
+    modified_date:
+        payload.modified_date
+}
+                ]]></ee:set-payload>
+
+            </ee:message>
+
+        </ee:transform>
+
+    </sub-flow>
+
+    <sub-flow
+            name="contact-database-upsert-subflow"
+            doc:id="0f7709c8-b9a3-4bf1-a0ff-8b72cbb8f0ba">
+
+        <logger
+                level="INFO"
+                doc:name="Log Database Upsert Subflow Reached"
+                doc:id="28609526-0257-40c3-9222-635081fcea99"
+                message="DATABASE_UPSERT_SUBFLOW_REACHED"/>
+
+        <!-- Preserve the database payload before database operations. -->
+        <set-variable
+                variableName="dbPayload"
+                value="#[payload]"
+                doc:name="Store Database Payload"
+                doc:id="91c81fa7-fdaa-4e66-ac58-ca3b3c14da5a"/>
+
+        <!-- Retrieve an existing Contact record with finite retry. -->
+        <until-successful
+                maxRetries="${app.maxRetries}"
+                millisBetweenRetries="${app.retryInterval}"
+                doc:name="Retry Retrieve Existing Contact"
+                doc:id="37e45a66-1022-4331-8410-77af1279ec7f">
+
+            <db:select
+                    config-ref="Database_Config"
+                    target="existingContact"
+                    doc:name="Retrieve Existing Contact Onboarding Record"
+                    doc:id="962af2a2-f1c1-4437-9f2b-a3c7987878fc">
+
+                <db:sql><![CDATA[
+SELECT contact_sf_id
+FROM contact_onboarding
+WHERE contact_sf_id = :contact_sf_id
+                ]]></db:sql>
+
+                <db:input-parameters><![CDATA[
+#[{
+    contact_sf_id: vars.dbPayload.contact_sf_id
+}]
+                ]]></db:input-parameters>
+
+            </db:select>
+
+        </until-successful>
+
+        <choice
+                doc:name="Evaluate Existing Contact Onboarding Record Availability"
+                doc:id="5d285596-e9cd-4964-8b15-a13d39a81315">
+
+            <when expression="#[!isEmpty(vars.existingContact)]">
+
+                <until-successful
+                        maxRetries="${app.maxRetries}"
+                        millisBetweenRetries="${app.retryInterval}"
+                        doc:name="Retry Update Contact Record"
+                        doc:id="94c0dac1-883e-4eef-a5dd-4b7479a3ab5d">
+
+                    <db:update
+                            config-ref="Database_Config"
+                            target="dbUpdateResult"
+                            doc:name="Update Contact Onboarding Record"
+                            doc:id="068df83f-f1c8-48a5-89a1-33e0400a55ed">
+
+                        <db:sql><![CDATA[
+UPDATE contact_onboarding
+SET
+    first_name = :first_name,
+    last_name = :last_name,
+    email = :email,
+    phone = :phone,
+    account_id = :account_id,
+    job_title = :job_title,
+    department = :department,
+    reports_to_id = :reports_to_id,
+    account_name = :account_name,
+    account_industry = :account_industry,
+    account_type = :account_type,
+    account_revenue = :account_revenue,
+    account_contact_count = :account_contact_count,
+    contact_priority = :contact_priority,
+    modified_date = :modified_date,
+    updated_at = NOW()
+WHERE contact_sf_id = :contact_sf_id
+                        ]]></db:sql>
+
+                        <db:input-parameters><![CDATA[
+#[vars.dbPayload]
+                        ]]></db:input-parameters>
+
+                    </db:update>
+
+                </until-successful>
+
+            </when>
+
+            <otherwise>
+
+                <until-successful
+                        maxRetries="${app.maxRetries}"
+                        millisBetweenRetries="${app.retryInterval}"
+                        doc:name="Retry Insert Contact Record"
+                        doc:id="c711f27e-3955-4c7c-9bf1-06aa1857602a">
+
+                    <db:insert
+                            config-ref="Database_Config"
+                            target="dbInsertResult"
+                            doc:name="Insert Contact Onboarding Record"
+                            doc:id="26c7a2a8-8562-49eb-9d65-4385ac9847c4">
+
+                        <db:sql><![CDATA[
+INSERT INTO contact_onboarding
+(
+    contact_sf_id,
+    first_name,
+    last_name,
+    email,
+    phone,
+    account_id,
+    job_title,
+    department,
+    reports_to_id,
+    account_name,
+    account_industry,
+    account_type,
+    account_revenue,
+    account_contact_count,
+    contact_priority,
+    modified_date,
+    created_at,
+    updated_at
+)
+VALUES
+(
+    :contact_sf_id,
+    :first_name,
+    :last_name,
+    :email,
+    :phone,
+    :account_id,
+    :job_title,
+    :department,
+    :reports_to_id,
+    :account_name,
+    :account_industry,
+    :account_type,
+    :account_revenue,
+    :account_contact_count,
+    :contact_priority,
+    :modified_date,
+    NOW(),
+    NOW()
+)
+                        ]]></db:sql>
+
+                        <db:input-parameters><![CDATA[
+#[vars.dbPayload]
+                        ]]></db:input-parameters>
+
+                    </db:insert>
+
+                </until-successful>
+
+            </otherwise>
+
+        </choice>
+
+        <logger
+    level="INFO"
+    doc:name="Log Contact Onboarding Database Persistence"
+    message='#[write({
+        event: "CONTACT_ONBOARDING_DATABASE_PERSISTED",
+        correlationId:
+            vars.messageCorrelationId default "NOT_AVAILABLE",
+        contactId:
+            vars.dbPayload.contact_sf_id default "UNKNOWN",
+        operation:
+            if (!isEmpty(vars.existingContact))
+                "UPDATE"
+            else
+                "INSERT"
+    }, "application/json")]'/>
+
+    </sub-flow>
+
+</mule>

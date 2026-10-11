@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule
+    xmlns="http://www.mulesoft.org/schema/mule/core"
+    xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+    xmlns:amqp="http://www.mulesoft.org/schema/mule/amqp"
+    xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd 
+        http://www.mulesoft.org/schema/mule/core
+        http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/ee/core
+        http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+        http://www.mulesoft.org/schema/mule/amqp
+        http://www.mulesoft.org/schema/mule/amqp/current/mule-amqp.xsd">
+
+    <flow name="contact-onboarding-message-consumer-flow">
+
+        <amqp:listener
+            config-ref="AMQP_Config"
+            queueName="${rabbitmq.onboardingQueue}"
+            ackMode="MANUAL"
+            recoverStrategy="REQUEUE"
+            createFallbackQueue="false"
+            doc:name="Receive Contact Onboarding RabbitMQ Message"/>
+
+        <ee:transform doc:name="Initialize Message Context">
+
+            <ee:message>
+                <ee:set-payload><![CDATA[
+%dw 2.0
+output application/json
+---
+if (payload is String)
+    read(payload, "application/json")
+else
+    payload
+                ]]></ee:set-payload>
+            </ee:message>
+
+            <ee:variables>
+
+                <ee:set-variable variableName="ackId"><![CDATA[
+%dw 2.0
+output application/java
+---
+attributes.ackId
+                ]]></ee:set-variable>
+
+                <ee:set-variable variableName="messageCorrelationId"><![CDATA[
+%dw 2.0
+output application/java
+---
+(correlationId default uuid()) as String
+                ]]></ee:set-variable>
+
+            </ee:variables>
+
+        </ee:transform>
+
+        <logger
+            level="INFO"
+            doc:name="Log Message Receipt"
+            message='#[write({
+                event: "CONTACT_ONBOARDING_MESSAGE_RECEIVED",
+                correlationId: vars.messageCorrelationId,
+                contactId: payload.contact_sf_id default "UNKNOWN"
+            }, "application/json")]'/>
+
+        <flow-ref
+            name="contact-onboarding-message-validation-subflow"
+            doc:name="Validate Contact Onboarding Message"/>
+
+        <flow-ref
+            name="contact-database-payload-builder-subflow"
+            doc:name="Build Database Payload"/>
+
+        <flow-ref
+            name="contact-database-upsert-subflow"
+            doc:name="Persist Contact Onboarding Record"/>
+
+        <amqp:ack
+            ackId="#[vars.ackId]"
+            doc:name="Acknowledge RabbitMQ Message"/>
+
+        <logger
+            level="INFO"
+            doc:name="Log Successful Acknowledgment"
+            message='#[write({
+                event: "CONTACT_ONBOARDING_MESSAGE_ACKNOWLEDGED",
+                correlationId: vars.messageCorrelationId,
+                contactId: vars.dbPayload.contact_sf_id default "UNKNOWN"
+            }, "application/json")]'/>
+
+        <error-handler>
+
+            <on-error-continue
+                type="VALIDATION:VALIDATION"
+                doc:name="Reject Invalid Message to DLQ">
+
+                <logger
+                    level="ERROR"
+                    doc:name="Log Validation Error"
+                    message='#[write({
+                        event: "CONTACT_VALIDATION_FAILED",
+                        correlationId:
+                            vars.messageCorrelationId default "NOT_AVAILABLE",
+                        description:
+                            error.description default "Validation failed",
+                        disposition: "REJECTED_TO_DLQ"
+                    }, "application/json")]'/>
+
+                <amqp:reject
+                    ackId="#[vars.ackId]"
+                    requeue="false"
+                    doc:name="Reject Invalid Message Without Requeue"/>
+
+            </on-error-continue>
+
+            <on-error-continue
+                type="DB:CONNECTIVITY"
+                doc:name="Requeue Database Connectivity Failure">
+
+                <logger
+                    level="ERROR"
+                    doc:name="Log Database Connectivity Error"
+                    message='#[write({
+                        event: "CONTACT_DATABASE_CONNECTIVITY_FAILED",
+                        correlationId:
+                            vars.messageCorrelationId default "NOT_AVAILABLE",
+                        description:
+                            error.description default "Database connectivity failed",
+                        disposition: "REQUEUED"
+                    }, "application/json")]'/>
+
+                <amqp:reject
+                    ackId="#[vars.ackId]"
+                    requeue="true"
+                    doc:name="Requeue Database Connectivity Failure"/>
+
+            </on-error-continue>
+
+            <on-error-continue
+                type="MULE:RETRY_EXHAUSTED"
+                doc:name="Requeue After Database Retries Exhausted">
+
+                <logger
+                    level="ERROR"
+                    doc:name="Log Retry Exhausted Error"
+                    message='#[write({
+                        event: "CONTACT_DATABASE_RETRIES_EXHAUSTED",
+                        correlationId:
+                            vars.messageCorrelationId default "NOT_AVAILABLE",
+                        description:
+                            error.description default "Database retries exhausted",
+                        disposition: "REQUEUED"
+                    }, "application/json")]'/>
+
+                <amqp:reject
+                    ackId="#[vars.ackId]"
+                    requeue="true"
+                    doc:name="Requeue After Retries Exhausted"/>
+
+            </on-error-continue>
+
+            <on-error-continue
+                type="MULE:CONNECTIVITY"
+                doc:name="Requeue Connectivity Failure">
+
+                <logger
+                    level="ERROR"
+                    doc:name="Log Connectivity Error"
+                    message='#[write({
+                        event: "CONTACT_CONNECTIVITY_FAILED",
+                        correlationId:
+                            vars.messageCorrelationId default "NOT_AVAILABLE",
+                        description:
+                            error.description default "Connectivity failure",
+                        disposition: "REQUEUED"
+                    }, "application/json")]'/>
+
+                <amqp:reject
+                    ackId="#[vars.ackId]"
+                    requeue="true"
+                    doc:name="Requeue Connectivity Failure"/>
+
+            </on-error-continue>
+
+            <on-error-propagate
+                type="MULE:EXPRESSION"
+                doc:name="Propagate Expression Error">
+
+                <logger
+                    level="ERROR"
+                    doc:name="Log Expression Error"
+                    message='#[write({
+                        event: "CONTACT_EXPRESSION_ERROR",
+                        correlationId:
+                            vars.messageCorrelationId default "NOT_AVAILABLE",
+                        description:
+                            error.description default "Expression failure",
+                        disposition: "NOT_ACKNOWLEDGED"
+                    }, "application/json")]'/>
+
+            </on-error-propagate>
+
+            <on-error-propagate
+                type="ANY"
+                doc:name="Propagate Unexpected Error">
+
+                <logger
+                    level="ERROR"
+                    doc:name="Log Unexpected Error"
+                    message='#[write({
+                        event: "CONTACT_UNEXPECTED_ERROR",
+                        correlationId:
+                            vars.messageCorrelationId default "NOT_AVAILABLE",
+                        description:
+                            error.description default "Unexpected failure",
+                        disposition: "NOT_ACKNOWLEDGED"
+                    }, "application/json")]'/>
+
+            </on-error-propagate>
+
+        </error-handler>
+
+    </flow>
+
+</mule>

@@ -1,0 +1,18 @@
+db:
+  host: "sql12.freesqldatabase.com"
+  port: "3306"
+  username: "sql12838449"
+  database: "sql12838449"
+
+app:
+  maxRetries: "3"
+  retryInterval: "5000"
+
+rabbitmq:
+  host: "shrimp.rmq.cloudamqp.com"
+  port: "5671"
+  virtualHost: "sprvzpca"
+  username: "sprvzpca"
+  useTls: "true"
+  useSni: "true"
+  onboardingQueue: "CONTACT.ONBOARDING.Q"

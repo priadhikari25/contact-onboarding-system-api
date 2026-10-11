@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule
+    xmlns="http://www.mulesoft.org/schema/mule/core"
+    xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:tls="http://www.mulesoft.org/schema/mule/tls"
+    xmlns:amqp="http://www.mulesoft.org/schema/mule/amqp"
+    xmlns:db="http://www.mulesoft.org/schema/mule/db"
+    xmlns:secure-properties="http://www.mulesoft.org/schema/mule/secure-properties"
+    xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd 
+http://www.mulesoft.org/schema/mule/tls http://www.mulesoft.org/schema/mule/tls/current/mule-tls.xsd 
+        http://www.mulesoft.org/schema/mule/core
+        http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+
+        http://www.mulesoft.org/schema/mule/tls
+        http://www.mulesoft.org/schema/mule/tls/current/mule-tls.xsd
+
+        http://www.mulesoft.org/schema/mule/amqp
+        http://www.mulesoft.org/schema/mule/amqp/current/mule-amqp.xsd
+
+        http://www.mulesoft.org/schema/mule/db
+        http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+
+        http://www.mulesoft.org/schema/mule/secure-properties
+        http://www.mulesoft.org/schema/mule/secure-properties/current/mule-secure-properties.xsd">
+
+    <configuration-properties
+            file="local-secrets.properties"
+            doc:name="Local Secrets"/>
+
+    <configuration-properties
+            file="config/config-dev.yaml"
+            doc:name="Development Configuration Properties"/>
+
+    <secure-properties:config
+            name="Secure_Properties_Config"
+            doc:name="Secure Properties Config"
+            doc:id="c2263f0c-6908-494e-8dac-ef21f4590b05"
+            file="secure/secure.properties"
+            key="${secure.key}">
+
+        <secure-properties:encrypt
+                algorithm="AES"
+                mode="CBC"/>
+
+    </secure-properties:config>
+
+    <tls:context
+            name="RabbitMQ_TLS_Context"
+            enabledProtocols="TLSv1.2">
+
+        <tls:trust-store/>
+
+    </tls:context>
+
+    <db:config
+            name="Database_Config"
+            doc:name="Database Config"
+            doc:id="d26e6bb1-a393-4cc9-a686-7c52ed3b3623">
+
+        <db:my-sql-connection
+                host="${db.host}"
+                port="${db.port}"
+                user="${db.username}"
+                password="${secure::db.password}"
+                database="${db.database}"/>
+
+    </db:config>
+
+    <amqp:config
+            name="AMQP_Config"
+            doc:name="CloudAMQP RabbitMQ Config"
+            createFallbackQueue="false"
+            createFallbackExchange="false"
+            sendCorrelationId="ALWAYS">
+
+        <amqp:connection
+                host="${rabbitmq.host}"
+                port="${rabbitmq.port}"
+                virtualHost="${rabbitmq.virtualHost}"
+                username="${rabbitmq.username}"
+                password="${secure::rabbitmq.password}"
+                useTls="${rabbitmq.useTls}"
+                useSni="${rabbitmq.useSni}"
+                tlsContext="RabbitMQ_TLS_Context">
+
+            <reconnection>
+                <reconnect
+                        frequency="5000"
+                        count="5"/>
+            </reconnection>
+
+        </amqp:connection>
+
+        <amqp:consumer-config
+                ackMode="MANUAL"/>
+
+        <amqp:quality-of-service-config
+                prefetchSize="0"
+                prefetchCount="1"/>
+
+    </amqp:config>
+
+</mule>

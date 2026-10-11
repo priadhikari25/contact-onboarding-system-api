@@ -1,0 +1,110 @@
+name: Mule CI-CD to CloudHub 2.0
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17 and Maven cache
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Create Maven settings for Anypoint Exchange
+        shell: bash
+        env:
+          ANYPOINT_CLIENT_ID: ${{ secrets.ANYPOINT_CLIENT_ID }}
+          ANYPOINT_CLIENT_SECRET: ${{ secrets.ANYPOINT_CLIENT_SECRET }}
+        run: |
+          mkdir -p ~/.m2
+          cat > ~/.m2/settings.xml <<EOF
+          <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                    xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd">
+            <servers>
+              <server>
+                <id>anypoint-exchange</id>
+                <username>~~~Client~~~</username>
+                <password>${ANYPOINT_CLIENT_ID}~?~${ANYPOINT_CLIENT_SECRET}</password>
+              </server>
+            </servers>
+          </settings>
+          EOF
+
+      - name: Run MUnit and package
+        run: mvn --batch-mode --no-transfer-progress clean verify
+
+      - name: Upload Mule package
+        uses: actions/upload-artifact@v4
+        with:
+          name: mule-application
+          path: target/*-mule-application.jar
+          if-no-files-found: error
+
+      - name: Upload MUnit coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: munit-coverage
+          path: target/site/munit/coverage/**
+          if-no-files-found: ignore
+
+  publish-deploy:
+    if: github.event_name != 'pull_request'
+    needs: build-test
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17 and Maven cache
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Create Maven settings for Anypoint Exchange
+        shell: bash
+        env:
+          ANYPOINT_CLIENT_ID: ${{ secrets.ANYPOINT_CLIENT_ID }}
+          ANYPOINT_CLIENT_SECRET: ${{ secrets.ANYPOINT_CLIENT_SECRET }}
+        run: |
+          mkdir -p ~/.m2
+          cat > ~/.m2/settings.xml <<EOF
+          <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                    xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd">
+            <servers>
+              <server>
+                <id>anypoint-exchange</id>
+                <username>~~~Client~~~</username>
+                <password>${ANYPOINT_CLIENT_ID}~?~${ANYPOINT_CLIENT_SECRET}</password>
+              </server>
+            </servers>
+          </settings>
+          EOF
+
+      - name: Publish to Exchange and deploy to CloudHub 2.0
+        env:
+          ANYPOINT_CLIENT_ID: ${{ secrets.ANYPOINT_CLIENT_ID }}
+          ANYPOINT_CLIENT_SECRET: ${{ secrets.ANYPOINT_CLIENT_SECRET }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          JMS_PASSWORD: ${{ secrets.JMS_PASSWORD }}
+        run: |
+          mvn --batch-mode --no-transfer-progress clean deploy -DmuleDeploy             -DskipMunitTests=true             -Danypoint.clientId="$ANYPOINT_CLIENT_ID"             -Danypoint.clientSecret="$ANYPOINT_CLIENT_SECRET"             -Dcloudhub.environment="${{ vars.CLOUDHUB_ENVIRONMENT }}"             -Dcloudhub.target="${{ vars.CLOUDHUB_TARGET }}"             -Dcloudhub.appName="${{ vars.CLOUDHUB_APP_NAME }}"             -Djms.brokerUrl="${{ vars.JMS_BROKER_URL }}"             -Djms.queueName="${{ vars.JMS_QUEUE_NAME }}"             -Djms.dlqName="${{ vars.JMS_DLQ_NAME }}"             -Djms.username="${{ vars.JMS_USERNAME }}"             -Djms.password="$JMS_PASSWORD"             -Ddb.host="${{ vars.DB_HOST }}"             -Ddb.port="${{ vars.DB_PORT }}"             -Ddb.user="${{ vars.DB_USER }}"             -Ddb.database="${{ vars.DB_DATABASE }}"             -Ddb.password="$DB_PASSWORD"

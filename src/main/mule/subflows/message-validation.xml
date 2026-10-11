@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule
+    xmlns="http://www.mulesoft.org/schema/mule/core"
+    xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:validation="http://www.mulesoft.org/schema/mule/validation"
+    xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd 
+        http://www.mulesoft.org/schema/mule/core
+        http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+
+        http://www.mulesoft.org/schema/mule/validation
+        http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd">
+
+    <sub-flow
+            name="contact-onboarding-message-validation-subflow"
+            doc:id="878e441e-9b65-4914-be90-58f82d9b1de8">
+
+        <validation:is-not-null
+                doc:name="Validate Salesforce Contact Identifier"
+                doc:id="ba1df66e-4081-4c23-9ded-74c4ec091077"
+                value="#[payload.contact_sf_id]"
+                message="Salesforce Contact Identifier is missing."/>
+
+        <validation:is-not-null
+                doc:name="Validate Contact Email Address"
+                doc:id="6aa60fac-0449-4ef6-aa2e-db2bfdb4e20f"
+                value="#[payload.email]"
+                message="Contact Email Address is missing."/>
+
+        <validation:is-not-null
+                doc:name="Validate Account Identifier"
+                doc:id="5c083b5b-ae6e-45bb-b89f-35602275f2d4"
+                value="#[payload.account_id]"
+                message="Account Identifier is missing."/>
+
+        <validation:matches-regex
+                doc:name="Validate Contact Email Format"
+                doc:id="e343a635-a5b8-47e0-9d72-86824549a621"
+                value="#[payload.email]"
+                regex="^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$"
+                message="Invalid Contact Email Address Format."/>
+
+    </sub-flow>
+
+</mule>
