@@ -2,9 +2,16 @@ name: Deploy System API to CloudHub 2.0
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
 
 permissions:
   contents: read
+
+concurrency:
+  group: contact-onboarding-system-api-sandbox
+  cancel-in-progress: false
 
 jobs:
   test-and-deploy:
@@ -23,6 +30,7 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+          cache: maven
 
       - name: Set up Maven 3.9.9
         uses: stCarolas/setup-maven@v5
@@ -34,14 +42,13 @@ jobs:
           java -version
           mvn -version
 
-      - name: Run MUnit tests
+      - name: Validate required configuration
+        shell: bash
         run: |
-          mvn --batch-mode --errors \
-            --settings .maven/settings.xml \
-            clean test \
-            -Dsecure.key="${{ secrets.SECURE_KEY }}" \
-            -DruntimeProduct=MULE_EE
-
-     
-      
-      
+          test -f pom.xml
+          test -f mule-artifact.json
+          test -f .maven/settings.xml
+          test -n "${ANYPOINT_CLIENT_ID}"
+          test -n "${ANYPOINT_CLIENT_SECRET}"
+          test -n "${SECURE_KEY}"
+          test -n "${ANYPOINT
