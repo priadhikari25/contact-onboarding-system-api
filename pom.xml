@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+﻿<?xml version="1.0" encoding="UTF-8"?>
 
 <project
     xmlns="http://maven.apache.org/POM/4.0.0"
@@ -224,7 +224,7 @@
             <name>Anypoint Exchange</name>
 
             <url>
-                https://maven.anypoint.mulesoft.com/api/v3/organizations/YOUR_ANYPOINT_ORG_ID/maven
+                https://maven.anypoint.mulesoft.com/api/v3/organizations/df08bea2-3ef2-4a40-b3c9-85c668f35a38/maven
             </url>
 
             <layout>default</layout>
