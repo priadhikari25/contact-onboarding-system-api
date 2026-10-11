@@ -51,4 +51,42 @@ jobs:
           test -n "${ANYPOINT_CLIENT_ID}"
           test -n "${ANYPOINT_CLIENT_SECRET}"
           test -n "${SECURE_KEY}"
-          test -n "${ANYPOINT
+          test -n "${ANYPOINT_ENVIRONMENT}"
+          test -n "${CLOUDHUB_TARGET}"
+          test -n "${APPLICATION_NAME}"
+          test -n "${MULE_VERSION}"
+        env:
+          SECURE_KEY: ${{ secrets.SECURE_KEY }}
+          ANYPOINT_ENVIRONMENT: ${{ vars.ANYPOINT_ENVIRONMENT }}
+          CLOUDHUB_TARGET: ${{ vars.CLOUDHUB_TARGET }}
+          APPLICATION_NAME: ${{ vars.APPLICATION_NAME }}
+          MULE_VERSION: ${{ vars.MULE_VERSION }}
+
+      - name: Validate Maven settings
+        run: |
+          mvn --batch-mode --errors \
+            --settings .maven/settings.xml \
+            help:effective-settings
+
+      - name: Run MUnit tests
+        run: |
+          mvn --batch-mode --errors \
+            --settings .maven/settings.xml \
+            clean test \
+            -Dsecure.key="${{ secrets.SECURE_KEY }}" \
+            -DruntimeProduct=MULE_EE
+
+      - name: Publish and deploy to CloudHub 2.0
+        run: |
+          mvn --batch-mode --errors \
+            --settings .maven/settings.xml \
+            clean deploy \
+            -DmuleDeploy \
+            -DskipMunitTests \
+            -Danypoint.clientId="${{ secrets.ANYPOINT_CLIENT_ID }}" \
+            -Danypoint.clientSecret="${{ secrets.ANYPOINT_CLIENT_SECRET }}" \
+            -Danypoint.environment="${{ vars.ANYPOINT_ENVIRONMENT }}" \
+            -Dcloudhub.target="${{ vars.CLOUDHUB_TARGET }}" \
+            -Dcloudhub.application.name="${{ vars.APPLICATION_NAME }}" \
+            -Dapp.runtime="${{ vars.MULE_VERSION }}" \
+            -Dsecure.key="${{ secrets.SECURE_KEY }}"
