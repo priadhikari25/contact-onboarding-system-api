@@ -12,134 +12,122 @@
 http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd 
         http://www.mulesoft.org/schema/mule/core
         http://www.mulesoft.org/schema/mule/core/current/mule.xsd
-
         http://www.mulesoft.org/schema/mule/munit
         http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
-
         http://www.mulesoft.org/schema/mule/munit-tools
         http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit-tools.xsd
-
         http://www.mulesoft.org/schema/mule/db
         http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
-
         http://www.mulesoft.org/schema/mule/amqp
         http://www.mulesoft.org/schema/mule/amqp/current/mule-amqp.xsd">
 
-    <munit:config name="munit"/>
+    <munit:config
+        name="contact-onboarding-orchestration-test-suite"
+        doc:name="MUnit Configuration"/>
 
-     <munit:test
-    name="testDatabaseUpdate"
-    description="Update an existing Contact record">
+    <!-- ========================================================= -->
+    <!-- Test 1: Update an existing Contact                        -->
+    <!-- ========================================================= -->
 
-    <munit:behavior>
+    <munit:test
+        name="testDatabaseUpdate"
+        description="Update an existing Contact record">
 
-        <munit-tools:mock-when processor="db:select">
+        <munit:behavior>
 
-            <munit-tools:then-return>
+            <munit-tools:mock-when processor="db:select">
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute
+                        attributeName="doc:name"
+                        whereValue="#['Check Existing Contact']"/>
+                </munit-tools:with-attributes>
 
-                <munit-tools:payload
-                    value='#[[
-                        {
-                            contact_sf_id: "003TEST"
-                        }
-                    ]]'
-                    mediaType="application/java"/>
-
-                <munit-tools:variables>
-
-                    <munit-tools:variable
-                        key="existingContact"
+                <munit-tools:then-return>
+                    <munit-tools:payload
                         value='#[[
                             {
                                 contact_sf_id: "003TEST"
                             }
                         ]]'
                         mediaType="application/java"/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
 
-                </munit-tools:variables>
+            <munit-tools:mock-when processor="db:update">
+                <munit-tools:then-return>
+                    <munit-tools:payload
+                        value="#[1]"
+                        mediaType="application/java"/>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
 
-            </munit-tools:then-return>
+        </munit:behavior>
 
-        </munit-tools:mock-when>
+        <munit:execution>
 
-        <munit-tools:mock-when processor="db:update">
+            <munit:set-event doc:name="Set Existing Contact Payload">
 
-            <munit-tools:then-return>
-
-                <munit-tools:payload
-                    value="#[1]"
+                <munit:payload
+                    value='#[{
+                        contact_sf_id: "003TEST",
+                        first_name: "Priya",
+                        last_name: "Adhikari",
+                        email: "priya.adhikari@test.com",
+                        phone: "9876543210",
+                        account_id: "001TEST",
+                        job_title: "Technical Trainee",
+                        department: "Technology",
+                        reports_to_id: null,
+                        reports_to_name: "Unassigned",
+                        account_name: "Microsoft",
+                        account_industry: "Technology",
+                        account_type: "Customer - Direct",
+                        account_revenue: 15000000,
+                        account_contact_count: 4,
+                        contact_priority: "HIGH",
+                        modified_date: "2026-10-11 10:33:15"
+                    }]'
                     mediaType="application/java"/>
 
-            </munit-tools:then-return>
+                <munit:variables>
+                    <munit:variable
+                        key="messageContext"
+                        value='#[{
+                            correlationId: "TEST-CORRELATION-UPDATE",
+                            contactId: "003TEST"
+                        }]'
+                        mediaType="application/java"/>
+                </munit:variables>
 
-        </munit-tools:mock-when>
+            </munit:set-event>
 
-    </munit:behavior>
+            <flow-ref
+                name="contact-database-upsert-subflow"
+                doc:name="Execute Database Update"/>
 
-    <munit:execution>
+        </munit:execution>
 
-        <munit:set-event doc:name="Set Existing Contact Payload">
+        <munit:validation>
 
-            <munit:payload
-                value='#[{
-                    contact_sf_id: "003TEST",
-                    first_name: "Priya",
-                    last_name: "Adhikari",
-                    email: "priya.adhikari@test.com",
-                    phone: "9876543210",
-                    account_id: "001TEST",
-                    job_title: "Technical Trainee",
-                    department: "Technology",
-                    reports_to_id: null,
-                    account_name: "Microsoft",
-                    account_industry: "Technology",
-                    account_type: "Customer - Direct",
-                    account_revenue: 15000000,
-                    account_contact_count: 4,
-                    contact_priority: "HIGH",
-                    modified_date: "2026-10-11 10:33:15"
-                }]'
-                mediaType="application/java"/>
+            <munit-tools:verify-call
+                processor="db:select"
+                times="1"/>
 
-            <munit:variables>
+            <munit-tools:verify-call
+                processor="db:update"
+                times="1"/>
 
-                <munit:variable
-                    key="messageCorrelationId"
-                    value="#['TEST-CORRELATION-UPDATE']"
-                    mediaType="application/java"/>
+            <munit-tools:verify-call
+                processor="db:insert"
+                times="0"/>
 
-            </munit:variables>
+        </munit:validation>
 
-        </munit:set-event>
+    </munit:test>
 
-        <flow-ref
-            name="contact-database-upsert-subflow"
-            doc:name="Execute Database Update"/>
-
-    </munit:execution>
-
-    <munit:validation>
-
-        <munit-tools:verify-call
-            processor="db:select"
-            times="1"/>
-
-        <munit-tools:verify-call
-            processor="db:update"
-            times="1"/>
-
-        <munit-tools:verify-call
-            processor="db:insert"
-            times="0"/>
-
-        <munit-tools:assert-that
-            expression="#[vars.existingContact]"
-            is="#[MunitTools::notNullValue()]"
-            message="Existing Contact result was not populated."/>
-
-    </munit:validation>
-
-</munit:test>
+    <!-- ========================================================= -->
+    <!-- Test 2: Insert a new Contact                              -->
+    <!-- ========================================================= -->
 
     <munit:test
         name="testDatabaseInsert"
@@ -148,6 +136,12 @@ http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/mu
         <munit:behavior>
 
             <munit-tools:mock-when processor="db:select">
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute
+                        attributeName="doc:name"
+                        whereValue="#['Check Existing Contact']"/>
+                </munit-tools:with-attributes>
+
                 <munit-tools:then-return>
                     <munit-tools:payload
                         value="#[[]]"
@@ -180,6 +174,7 @@ http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/mu
                         job_title: "Technical Trainee",
                         department: "Technology",
                         reports_to_id: null,
+                        reports_to_name: "Unassigned",
                         account_name: "Microsoft",
                         account_industry: "Technology",
                         account_type: "Customer - Direct",
@@ -191,12 +186,13 @@ http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/mu
                     mediaType="application/java"/>
 
                 <munit:variables>
-
                     <munit:variable
-                        key="messageCorrelationId"
-                        value="#['TEST-CORRELATION-INSERT']"
+                        key="messageContext"
+                        value='#[{
+                            correlationId: "TEST-CORRELATION-INSERT",
+                            contactId: "003NEW"
+                        }]'
                         mediaType="application/java"/>
-
                 </munit:variables>
 
             </munit:set-event>
@@ -225,64 +221,429 @@ http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/mu
 
     </munit:test>
 
+    <!-- ========================================================= -->
+    <!-- Test 3: Missing Account ID stored in failure table         -->
+    <!-- ========================================================= -->
+
     <munit:test
-        name="testValidationFailure"
-        description="Validate rejection of an invalid Contact message"
-        expectedErrorType="VALIDATION:VALIDATION">
+        name="testMissingAccountIdStoresFailure"
+        description="Store missing Account ID validation failure and reject the RabbitMQ message">
+
+        <munit:behavior>
+
+            <munit-tools:mock-when processor="db:insert">
+
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute
+                        attributeName="doc:name"
+                        whereValue="#['Store Contact Onboarding Failure']"/>
+                </munit-tools:with-attributes>
+
+                <munit-tools:then-return>
+                    <munit-tools:payload
+                        value="#[1]"
+                        mediaType="application/java"/>
+                </munit-tools:then-return>
+
+            </munit-tools:mock-when>
+
+            <munit-tools:mock-when processor="amqp:reject">
+
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute
+                        attributeName="doc:name"
+                        whereValue="#['Reject Invalid Message Without Requeue']"/>
+                </munit-tools:with-attributes>
+
+            </munit-tools:mock-when>
+
+            <munit-tools:mock-when processor="amqp:ack">
+
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute
+                        attributeName="doc:name"
+                        whereValue="#['Acknowledge RabbitMQ Message']"/>
+                </munit-tools:with-attributes>
+
+            </munit-tools:mock-when>
+
+        </munit:behavior>
 
         <munit:execution>
 
-            <munit:set-event doc:name="Set Invalid Contact Payload">
+            <munit:set-event doc:name="Set Message Missing Account ID">
 
                 <munit:payload
                     value='#[{
-                        contact_sf_id: null,
+                        contact_sf_id: "003MISSINGACCOUNT",
                         first_name: "Priya",
                         last_name: "Adhikari",
-                        email: null,
+                        email: "priya.adhikari@test.com",
                         phone: "9876543210",
                         account_id: null,
                         job_title: "Technical Trainee",
                         department: "Technology",
                         reports_to_id: null,
-                        account_name: "Microsoft",
-                        account_industry: "Technology",
-                        account_type: "Customer - Direct",
-                        account_revenue: 15000000,
-                        account_contact_count: 4,
-                        contact_priority: "HIGH",
-                        modified_date: "2026-10-11 10:33:15"
+                        reports_to_name: "Unassigned",
+                        account_name: "Unknown",
+                        account_industry: null,
+                        account_type: null,
+                        account_revenue: null,
+                        account_contact_count: 0,
+                        contact_priority: "NORMAL",
+                        modified_date: "2026-10-12 13:00:00"
+                    }]'
+                    mediaType="application/java"/>
+
+                <munit:attributes
+                    value='#[{
+                        ackId: "ACK-MISSING-ACCOUNT"
                     }]'
                     mediaType="application/java"/>
 
             </munit:set-event>
 
             <flow-ref
-                name="contact-onboarding-message-validation-subflow"
-                doc:name="Execute Message Validation"/>
+                name="contact-onboarding-message-consumer-flow"
+                doc:name="Execute Missing Account Failure Path"/>
 
         </munit:execution>
 
+        <munit:validation>
+
+            <munit-tools:assert-that
+                expression="#[vars.messageContext.contactId]"
+                is="#[MunitTools::equalTo('003MISSINGACCOUNT')]"
+                message="Contact ID was not preserved."/>
+
+            <munit-tools:assert-that
+                expression="#[vars.messageContext.failureRecord.errorMessage]"
+                is="#[MunitTools::equalTo('Account Identifier is missing.')]"
+                message="Incorrect missing Account ID error message."/>
+
+            <munit-tools:assert-that
+                expression="#[vars.messageContext.failureRecord.correlationId]"
+                is="#[MunitTools::notNullValue()]"
+                message="Correlation ID was not stored."/>
+
+            <munit-tools:assert-that
+                expression="#[vars.messageContext.failureRecord.originalPayload]"
+                is="#[MunitTools::containsString('003MISSINGACCOUNT')]"
+                message="Original message was not preserved."/>
+
+            <munit-tools:verify-call
+                processor="db:insert"
+                times="1">
+
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute
+                        attributeName="doc:name"
+                        whereValue="#['Store Contact Onboarding Failure']"/>
+                </munit-tools:with-attributes>
+
+            </munit-tools:verify-call>
+
+            <munit-tools:verify-call
+                processor="amqp:reject"
+                times="1">
+
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute
+                        attributeName="doc:name"
+                        whereValue="#['Reject Invalid Message Without Requeue']"/>
+                </munit-tools:with-attributes>
+
+            </munit-tools:verify-call>
+
+            <munit-tools:verify-call
+                processor="amqp:ack"
+                times="0">
+
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute
+                        attributeName="doc:name"
+                        whereValue="#['Acknowledge RabbitMQ Message']"/>
+                </munit-tools:with-attributes>
+
+            </munit-tools:verify-call>
+
+        </munit:validation>
+
     </munit:test>
+
+    <!-- ========================================================= -->
+    <!-- Test 4: Missing email stored in failure table              -->
+    <!-- ========================================================= -->
+
+    <munit:test
+        name="testMissingEmailStoresFailure"
+        description="Store missing email validation failure and reject the RabbitMQ message">
+
+        <munit:behavior>
+
+            <munit-tools:mock-when processor="db:insert">
+
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute
+                        attributeName="doc:name"
+                        whereValue="#['Store Contact Onboarding Failure']"/>
+                </munit-tools:with-attributes>
+
+                <munit-tools:then-return>
+                    <munit-tools:payload
+                        value="#[1]"
+                        mediaType="application/java"/>
+                </munit-tools:then-return>
+
+            </munit-tools:mock-when>
+
+            <munit-tools:mock-when processor="amqp:reject">
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute
+                        attributeName="doc:name"
+                        whereValue="#['Reject Invalid Message Without Requeue']"/>
+                </munit-tools:with-attributes>
+            </munit-tools:mock-when>
+
+            <munit-tools:mock-when processor="amqp:ack">
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute
+                        attributeName="doc:name"
+                        whereValue="#['Acknowledge RabbitMQ Message']"/>
+                </munit-tools:with-attributes>
+            </munit-tools:mock-when>
+
+        </munit:behavior>
+
+        <munit:execution>
+
+            <munit:set-event doc:name="Set Message Missing Email">
+
+                <munit:payload
+                    value='#[{
+                        contact_sf_id: "003MISSINGEMAIL",
+                        first_name: "Priya",
+                        last_name: "Adhikari",
+                        email: null,
+                        phone: "9876543210",
+                        account_id: "001TEST",
+                        job_title: "Technical Trainee",
+                        department: "Technology",
+                        reports_to_id: null,
+                        reports_to_name: "Unassigned",
+                        account_name: "Microsoft",
+                        account_industry: "Technology",
+                        account_type: "Customer - Direct",
+                        account_revenue: 15000000,
+                        account_contact_count: 4,
+                        contact_priority: "HIGH",
+                        modified_date: "2026-10-12 13:00:00"
+                    }]'
+                    mediaType="application/java"/>
+
+                <munit:attributes
+                    value='#[{
+                        ackId: "ACK-MISSING-EMAIL"
+                    }]'
+                    mediaType="application/java"/>
+
+            </munit:set-event>
+
+            <flow-ref
+                name="contact-onboarding-message-consumer-flow"
+                doc:name="Execute Missing Email Failure Path"/>
+
+        </munit:execution>
+
+        <munit:validation>
+
+            <munit-tools:assert-that
+                expression="#[vars.messageContext.failureRecord.errorMessage]"
+                is="#[MunitTools::equalTo('Contact Email Address is missing.')]"
+                message="Incorrect missing email error message."/>
+
+            <munit-tools:verify-call
+                processor="db:insert"
+                times="1">
+
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute
+                        attributeName="doc:name"
+                        whereValue="#['Store Contact Onboarding Failure']"/>
+                </munit-tools:with-attributes>
+
+            </munit-tools:verify-call>
+
+            <munit-tools:verify-call
+                processor="amqp:reject"
+                times="1">
+
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute
+                        attributeName="doc:name"
+                        whereValue="#['Reject Invalid Message Without Requeue']"/>
+                </munit-tools:with-attributes>
+
+            </munit-tools:verify-call>
+
+            <munit-tools:verify-call
+                processor="amqp:ack"
+                times="0">
+
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute
+                        attributeName="doc:name"
+                        whereValue="#['Acknowledge RabbitMQ Message']"/>
+                </munit-tools:with-attributes>
+
+            </munit-tools:verify-call>
+
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- ========================================================= -->
+    <!-- Test 5: Invalid email stored in failure table              -->
+    <!-- ========================================================= -->
+
+    <munit:test
+        name="testInvalidEmailStoresFailure"
+        description="Store invalid email validation failure and reject the RabbitMQ message">
+
+        <munit:behavior>
+
+            <munit-tools:mock-when processor="db:insert">
+
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute
+                        attributeName="doc:name"
+                        whereValue="#['Store Contact Onboarding Failure']"/>
+                </munit-tools:with-attributes>
+
+                <munit-tools:then-return>
+                    <munit-tools:payload
+                        value="#[1]"
+                        mediaType="application/java"/>
+                </munit-tools:then-return>
+
+            </munit-tools:mock-when>
+
+            <munit-tools:mock-when processor="amqp:reject">
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute
+                        attributeName="doc:name"
+                        whereValue="#['Reject Invalid Message Without Requeue']"/>
+                </munit-tools:with-attributes>
+            </munit-tools:mock-when>
+
+            <munit-tools:mock-when processor="amqp:ack">
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute
+                        attributeName="doc:name"
+                        whereValue="#['Acknowledge RabbitMQ Message']"/>
+                </munit-tools:with-attributes>
+            </munit-tools:mock-when>
+
+        </munit:behavior>
+
+        <munit:execution>
+
+            <munit:set-event doc:name="Set Invalid Email Message">
+
+                <munit:payload
+                    value='#[{
+                        contact_sf_id: "003INVALIDEMAIL",
+                        first_name: "Priya",
+                        last_name: "Adhikari",
+                        email: "invalid-email",
+                        phone: "9876543210",
+                        account_id: "001TEST",
+                        job_title: "Technical Trainee",
+                        department: "Technology",
+                        reports_to_id: null,
+                        reports_to_name: "Unassigned",
+                        account_name: "Microsoft",
+                        account_industry: "Technology",
+                        account_type: "Customer - Direct",
+                        account_revenue: 15000000,
+                        account_contact_count: 4,
+                        contact_priority: "HIGH",
+                        modified_date: "2026-10-12 13:00:00"
+                    }]'
+                    mediaType="application/java"/>
+
+                <munit:attributes
+                    value='#[{
+                        ackId: "ACK-INVALID-EMAIL"
+                    }]'
+                    mediaType="application/java"/>
+
+            </munit:set-event>
+
+            <flow-ref
+                name="contact-onboarding-message-consumer-flow"
+                doc:name="Execute Invalid Email Failure Path"/>
+
+        </munit:execution>
+
+        <munit:validation>
+
+            <munit-tools:assert-that
+                expression="#[vars.messageContext.failureRecord.errorMessage]"
+                is="#[MunitTools::equalTo('Invalid Contact Email Address Format.')]"
+                message="Incorrect invalid email error message."/>
+
+            <munit-tools:verify-call
+                processor="db:insert"
+                times="1">
+
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute
+                        attributeName="doc:name"
+                        whereValue="#['Store Contact Onboarding Failure']"/>
+                </munit-tools:with-attributes>
+
+            </munit-tools:verify-call>
+
+            <munit-tools:verify-call
+                processor="amqp:reject"
+                times="1">
+
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute
+                        attributeName="doc:name"
+                        whereValue="#['Reject Invalid Message Without Requeue']"/>
+                </munit-tools:with-attributes>
+
+            </munit-tools:verify-call>
+
+            <munit-tools:verify-call
+                processor="amqp:ack"
+                times="0">
+
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute
+                        attributeName="doc:name"
+                        whereValue="#['Acknowledge RabbitMQ Message']"/>
+                </munit-tools:with-attributes>
+
+            </munit-tools:verify-call>
+
+        </munit:validation>
+
+    </munit:test>
+
+    <!-- ========================================================= -->
+    <!-- Test 6: Successful processing followed by ACK              -->
+    <!-- ========================================================= -->
 
     <munit:test
         name="testAckAfterSuccess"
-        description="Acknowledge RabbitMQ message after database success">
+        description="Acknowledge the RabbitMQ message only after successful database processing">
 
         <munit:behavior>
 
             <munit-tools:mock-when processor="flow-ref">
-
-                <munit-tools:with-attributes>
-                    <munit-tools:with-attribute
-                        attributeName="name"
-                        whereValue="#['contact-onboarding-message-validation-subflow']"/>
-                </munit-tools:with-attributes>
-
-            </munit-tools:mock-when>
-
-            <munit-tools:mock-when processor="flow-ref">
-
                 <munit-tools:with-attributes>
                     <munit-tools:with-attribute
                         attributeName="name"
@@ -290,54 +651,32 @@ http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/mu
                 </munit-tools:with-attributes>
 
                 <munit-tools:then-return>
-
-                    <munit-tools:payload
-                        value='#[{
-                            contact_sf_id: "003ACK",
-                            first_name: "Priya",
-                            last_name: "Adhikari",
-                            email: "priya.adhikari@test.com",
-                            phone: "9876543210",
-                            account_id: "001TEST",
-                            job_title: "Technical Trainee",
-                            department: "Technology",
-                            reports_to_id: null,
-                            account_name: "Microsoft",
-                            account_industry: "Technology",
-                            account_type: "Customer - Direct",
-                            account_revenue: 15000000,
-                            account_contact_count: 4,
-                            contact_priority: "HIGH",
-                            modified_date: "2026-10-11 10:33:15"
-                        }]'
-                        mediaType="application/java"/>
-
                     <munit-tools:variables>
-
                         <munit-tools:variable
                             key="dbPayload"
                             value='#[{
                                 contact_sf_id: "003ACK"
                             }]'
                             mediaType="application/java"/>
-
                     </munit-tools:variables>
-
                 </munit-tools:then-return>
-
             </munit-tools:mock-when>
 
             <munit-tools:mock-when processor="flow-ref">
-
                 <munit-tools:with-attributes>
                     <munit-tools:with-attribute
                         attributeName="name"
                         whereValue="#['contact-database-upsert-subflow']"/>
                 </munit-tools:with-attributes>
-
             </munit-tools:mock-when>
 
-            <munit-tools:mock-when processor="amqp:ack"/>
+            <munit-tools:mock-when processor="amqp:ack">
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute
+                        attributeName="doc:name"
+                        whereValue="#['Acknowledge RabbitMQ Message']"/>
+                </munit-tools:with-attributes>
+            </munit-tools:mock-when>
 
             <munit-tools:mock-when processor="amqp:reject"/>
 
@@ -379,57 +718,139 @@ http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/mu
 
             <flow-ref
                 name="contact-onboarding-message-consumer-flow"
-                doc:name="Execute Contact Onboarding Consumer"/>
+                doc:name="Execute Successful Consumer Flow"/>
 
         </munit:execution>
 
         <munit:validation>
 
+            <munit-tools:assert-that
+                expression="#[vars.messageContext.contactId]"
+                is="#[MunitTools::equalTo('003ACK')]"
+                message="Incorrect Contact ID in message context."/>
+
+            <munit-tools:assert-that
+                expression="#[vars.messageContext.originalPayload.account_id]"
+                is="#[MunitTools::equalTo('001TEST')]"
+                message="Account ID was not preserved."/>
+
+            <munit-tools:verify-call
+                processor="flow-ref"
+                times="1">
+
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute
+                        attributeName="name"
+                        whereValue="#['contact-database-payload-builder-subflow']"/>
+                </munit-tools:with-attributes>
+
+            </munit-tools:verify-call>
+
+            <munit-tools:verify-call
+                processor="flow-ref"
+                times="1">
+
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute
+                        attributeName="name"
+                        whereValue="#['contact-database-upsert-subflow']"/>
+                </munit-tools:with-attributes>
+
+            </munit-tools:verify-call>
+
             <munit-tools:verify-call
                 processor="amqp:ack"
-                times="1"/>
+                times="1">
+
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute
+                        attributeName="doc:name"
+                        whereValue="#['Acknowledge RabbitMQ Message']"/>
+                </munit-tools:with-attributes>
+
+            </munit-tools:verify-call>
 
             <munit-tools:verify-call
                 processor="amqp:reject"
                 times="0"/>
 
+            <munit-tools:verify-call
+                processor="db:insert"
+                times="0">
+
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute
+                        attributeName="doc:name"
+                        whereValue="#['Store Contact Onboarding Failure']"/>
+                </munit-tools:with-attributes>
+
+            </munit-tools:verify-call>
+
         </munit:validation>
 
     </munit:test>
 
-  
+    <!-- ========================================================= -->
+    <!-- Test 7: DB retry exhausted, no ACK, message requeued       -->
+    <!-- ========================================================= -->
 
-<munit:test
-    name="testDatabaseFailureRequeue"
-    description="Reject and requeue after database retry exhaustion">
+    <munit:test
+        name="testDatabaseFailureRequeue"
+        description="Reject with requeue when database retries are exhausted">
 
-    <munit:behavior>
+        <munit:behavior>
 
-        <munit-tools:mock-when processor="flow-ref">
+            <munit-tools:mock-when processor="flow-ref">
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute
+                        attributeName="name"
+                        whereValue="#['contact-database-payload-builder-subflow']"/>
+                </munit-tools:with-attributes>
 
-            <munit-tools:with-attributes>
+                <munit-tools:then-return>
+                    <munit-tools:variables>
+                        <munit-tools:variable
+                            key="dbPayload"
+                            value='#[{
+                                contact_sf_id: "003FAIL"
+                            }]'
+                            mediaType="application/java"/>
+                    </munit-tools:variables>
+                </munit-tools:then-return>
+            </munit-tools:mock-when>
 
-                <munit-tools:with-attribute
-                    attributeName="name"
-                    whereValue="#['contact-onboarding-message-validation-subflow']"/>
+            <munit-tools:mock-when processor="flow-ref">
 
-            </munit-tools:with-attributes>
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute
+                        attributeName="name"
+                        whereValue="#['contact-database-upsert-subflow']"/>
+                </munit-tools:with-attributes>
 
-        </munit-tools:mock-when>
+                <munit-tools:then-return>
+                    <munit-tools:error
+                        typeId="MULE:RETRY_EXHAUSTED"/>
+                </munit-tools:then-return>
 
-        <munit-tools:mock-when processor="flow-ref">
+            </munit-tools:mock-when>
 
-            <munit-tools:with-attributes>
+            <munit-tools:mock-when processor="amqp:ack"/>
 
-                <munit-tools:with-attribute
-                    attributeName="name"
-                    whereValue="#['contact-database-payload-builder-subflow']"/>
+            <munit-tools:mock-when processor="amqp:reject">
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute
+                        attributeName="doc:name"
+                        whereValue="#['Requeue After Retries Exhausted']"/>
+                </munit-tools:with-attributes>
+            </munit-tools:mock-when>
 
-            </munit-tools:with-attributes>
+        </munit:behavior>
 
-            <munit-tools:then-return>
+        <munit:execution>
 
-                <munit-tools:payload
+            <munit:set-event doc:name="Set Database Failure Message">
+
+                <munit:payload
                     value='#[{
                         contact_sf_id: "003FAIL",
                         first_name: "Priya",
@@ -451,87 +872,40 @@ http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/mu
                     }]'
                     mediaType="application/java"/>
 
-            </munit-tools:then-return>
+                <munit:attributes
+                    value='#[{
+                        ackId: "ACK-FAIL"
+                    }]'
+                    mediaType="application/java"/>
 
-        </munit-tools:mock-when>
+            </munit:set-event>
 
-        <munit-tools:mock-when processor="flow-ref">
+            <flow-ref
+                name="contact-onboarding-message-consumer-flow"
+                doc:name="Execute Database Failure Path"/>
 
-            <munit-tools:with-attributes>
+        </munit:execution>
 
-                <munit-tools:with-attribute
-                    attributeName="name"
-                    whereValue="#['contact-database-upsert-subflow']"/>
+        <munit:validation>
 
-            </munit-tools:with-attributes>
+            <munit-tools:verify-call
+                processor="amqp:ack"
+                times="0"/>
 
-            <munit-tools:then-return>
+            <munit-tools:verify-call
+                processor="amqp:reject"
+                times="1">
 
-                <munit-tools:error
-                    typeId="MULE:RETRY_EXHAUSTED"/>
+                <munit-tools:with-attributes>
+                    <munit-tools:with-attribute
+                        attributeName="doc:name"
+                        whereValue="#['Requeue After Retries Exhausted']"/>
+                </munit-tools:with-attributes>
 
-            </munit-tools:then-return>
+            </munit-tools:verify-call>
 
-        </munit-tools:mock-when>
+        </munit:validation>
 
-        <munit-tools:mock-when processor="amqp:ack"/>
-
-        <munit-tools:mock-when processor="amqp:reject"/>
-
-    </munit:behavior>
-
-    <munit:execution>
-
-        <munit:set-event doc:name="Set Database Failure Message">
-
-            <munit:payload
-                value='#[{
-                    contact_sf_id: "003FAIL",
-                    first_name: "Priya",
-                    last_name: "Adhikari",
-                    email: "priya.adhikari@test.com",
-                    phone: "9876543210",
-                    account_id: "001TEST",
-                    job_title: "Technical Trainee",
-                    department: "Technology",
-                    reports_to_id: null,
-                    reports_to_name: "Unassigned",
-                    account_name: "Microsoft",
-                    account_industry: "Technology",
-                    account_type: "Customer - Direct",
-                    account_revenue: 15000000,
-                    account_contact_count: 4,
-                    contact_priority: "HIGH",
-                    modified_date: "2026-10-11 10:33:15"
-                }]'
-                mediaType="application/java"/>
-
-            <munit:attributes
-                value='#[{
-                    ackId: "ACK-FAIL"
-                }]'
-                mediaType="application/java"/>
-
-        </munit:set-event>
-
-        <flow-ref
-            name="contact-onboarding-message-consumer-flow"
-            doc:name="Execute Database Failure Path"/>
-
-    </munit:execution>
-
-    <munit:validation>
-
-        <munit-tools:verify-call
-            processor="amqp:ack"
-            times="0"/>
-
-        <munit-tools:verify-call
-            processor="amqp:reject"
-            times="1"/>
-
-    </munit:validation>
-
-</munit:test>
+    </munit:test>
 
 </mule>
