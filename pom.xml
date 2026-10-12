@@ -25,7 +25,7 @@
         <munit.version>3.7.3</munit.version>
 
         <anypoint.environment>Sandbox</anypoint.environment>
-        <cloudhub.target>Shared Space</cloudhub.target>
+        <cloudhub.target>Cloudhub-US-East-2</cloudhub.target>
         <cloudhub.application.name>contact-onboarding-system-api</cloudhub.application.name>
 
         <anypoint.clientId></anypoint.clientId>
