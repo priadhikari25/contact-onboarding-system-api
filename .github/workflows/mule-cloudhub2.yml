@@ -165,7 +165,21 @@ jobs:
 
           echo "Mule application artifact created successfully."
 
-           - name: Publish application version to Anypoint Exchange
+      - name: Verify Mule application artifact
+        shell: bash
+        run: |
+          ARTIFACT_PATH="target/contact-onboarding-system-api-1.0.1-mule-application.jar"
+
+          if [ ! -f "${ARTIFACT_PATH}" ]; then
+            echo "Mule application JAR was not created."
+            echo "Expected artifact: ${ARTIFACT_PATH}"
+            exit 1
+          fi
+
+          echo "Mule application artifact created successfully."
+          ls -la "${ARTIFACT_PATH}"
+
+      - name: Publish application version to Anypoint Exchange
         shell: bash
         run: >-
           mvn
@@ -199,7 +213,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: contact-onboarding-system-api-1.0.1
-          path: target/*-mule-application.jar
+          path: target/contact-onboarding-system-api-1.0.1-mule-application.jar
           if-no-files-found: warn
 
       - name: Remove generated secure properties file
@@ -207,5 +221,4 @@ jobs:
         shell: bash
         run: |
           rm -f src/main/resources/secure/secure.properties
-          echo "Generated secure properties file removed from the GitHub runner."
           echo "Generated secure properties file removed from the GitHub runner."
