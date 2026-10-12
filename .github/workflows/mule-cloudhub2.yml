@@ -16,20 +16,17 @@ concurrency:
 jobs:
   test-and-deploy:
     runs-on: ubuntu-latest
-
     env:
       ANYPOINT_CLIENT_ID: ${{ secrets.ANYPOINT_CLIENT_ID }}
       ANYPOINT_CLIENT_SECRET: ${{ secrets.ANYPOINT_CLIENT_SECRET }}
       NEXUS_USERNAME: ${{ secrets.NEXUS_USERNAME }}
       NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
       SECURE_KEY: ${{ secrets.SECURE_KEY }}
-
       ANYPOINT_ORG_ID: ${{ vars.ANYPOINT_ORG_ID }}
       ANYPOINT_ENVIRONMENT: ${{ vars.ANYPOINT_ENVIRONMENT }}
       CLOUDHUB_TARGET: ${{ vars.CLOUDHUB_TARGET }}
       APPLICATION_NAME: ${{ vars.APPLICATION_NAME }}
       MULE_VERSION: ${{ vars.MULE_VERSION }}
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -58,7 +55,6 @@ jobs:
           test -f pom.xml
           test -f mule-artifact.json
           test -f .maven/settings.xml
-
           echo "Required project files are present."
 
       - name: Validate required secrets and variables
@@ -69,13 +65,11 @@ jobs:
           test -n "${NEXUS_USERNAME}"
           test -n "${NEXUS_PASSWORD}"
           test -n "${SECURE_KEY}"
-
           test -n "${ANYPOINT_ORG_ID}"
           test -n "${ANYPOINT_ENVIRONMENT}"
           test -n "${CLOUDHUB_TARGET}"
           test -n "${APPLICATION_NAME}"
           test -n "${MULE_VERSION}"
-
           echo "Required GitHub secrets and variables are available."
 
       - name: Validate CloudHub target
@@ -83,10 +77,9 @@ jobs:
         run: |
           if [ "${CLOUDHUB_TARGET}" != "Cloudhub-US-East-2" ]; then
             echo "Invalid CLOUDHUB_TARGET: ${CLOUDHUB_TARGET}"
-            echo "For CloudHub 2.0 Shared Space in US East Ohio, use Cloudhub-US-East-2."
+            echo "Expected value: Cloudhub-US-East-2"
             exit 1
           fi
-
           echo "CloudHub target is valid: ${CLOUDHUB_TARGET}"
 
       - name: Display deployment configuration
@@ -104,64 +97,50 @@ jobs:
             echo "A secret properties file is tracked by Git."
             exit 1
           fi
-
           echo "No secret properties files are tracked."
 
       - name: Validate Maven settings
         shell: bash
-        run: |
-          mvn \
-            --batch-mode \
-            --errors \
-            --settings .maven/settings.xml \
-            help:effective-settings
+        run: >-
+          mvn --batch-mode --errors
+          --settings .maven/settings.xml
+          help:effective-settings
 
       - name: Run MUnit tests and package
         shell: bash
-        run: |
-          mvn \
-            --batch-mode \
-            --errors \
-            --settings .maven/settings.xml \
-            clean package \
-            -Dsecure.key="${SECURE_KEY}" \
-            -DruntimeProduct=MULE_EE
+        run: >-
+          mvn --batch-mode --errors
+          --settings .maven/settings.xml
+          clean package
+          -Dsecure.key="${SECURE_KEY}"
+          -DruntimeProduct=MULE_EE
 
       - name: Verify Mule application artifact
         shell: bash
         run: |
           ls -la target
-
-          ARTIFACT_COUNT=$(find target \
-            -maxdepth 1 \
-            -type f \
-            -name '*-mule-application.jar' \
-         *  | wc -l)
-
+          ARTIFACT_COUNT=$(find target -maxdepth 1 -type f -name '*-mule-application.jar' | wc -l)
           if [ "${ARTIFACT_COUNT}" -eq 0 ]; then
             echo "No Mule application JAR was created."
             exit 1
           fi
-
           echo "Mule application artifact created successfully."
 
       - name: Publish and deploy to CloudHub 2.0
         shell: bash
-        run: |
-          mvn \
-            --batch-mode \
-            --errors \
-            --settings .maven/settings.xml \
-            clean deploy \
-            -DmuleDeploy \
-            -DskipMunitTests \
-            -Danypoint.clientId="${ANYPOINT_CLIENT_ID}" \
-            -Danypoint.clientSecret="${ANYPOINT_CLIENT_SECRET}" \
-            -Danypoint.environment="${ANYPOINT_ENVIRONMENT}" \
-            -Dcloudhub.target="${CLOUDHUB_TARGET}" \
-            -Dcloudhub.application.name="${APPLICATION_NAME}" \
-            -Dapp.runtime="${MULE_VERSION}" \
-            -Dsecure.key="${SECURE_KEY}"
+        run: >-
+          mvn --batch-mode --errors
+          --settings .maven/settings.xml
+          clean deploy
+          -DmuleDeploy
+          -DskipMunitTests
+          -Danypoint.clientId="${ANYPOINT_CLIENT_ID}"
+          -Danypoint.clientSecret="${ANYPOINT_CLIENT_SECRET}"
+          -Danypoint.environment="${ANYPOINT_ENVIRONMENT}"
+          -Dcloudhub.target="${CLOUDHUB_TARGET}"
+          -Dcloudhub.application.name="${APPLICATION_NAME}"
+          -Dapp.runtime="${MULE_VERSION}"
+          -Dsecure.key="${SECURE_KEY}"
 
       - name: Upload Mule application artifact
         if: always()
