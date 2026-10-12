@@ -19,8 +19,6 @@ jobs:
     env:
       ANYPOINT_CLIENT_ID: ${{ secrets.ANYPOINT_CLIENT_ID }}
       ANYPOINT_CLIENT_SECRET: ${{ secrets.ANYPOINT_CLIENT_SECRET }}
-      NEXUS_USERNAME: ${{ secrets.NEXUS_USERNAME }}
-      NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
       SECURE_KEY: ${{ secrets.SECURE_KEY }}
       ANYPOINT_ORG_ID: ${{ vars.ANYPOINT_ORG_ID }}
       ANYPOINT_ENVIRONMENT: ${{ vars.ANYPOINT_ENVIRONMENT }}
@@ -49,7 +47,7 @@ jobs:
           java -version
           mvn -version
 
-      - name: Validate required files
+      - name: Validate required project files
         shell: bash
         run: |
           test -f pom.xml
@@ -62,8 +60,6 @@ jobs:
         run: |
           test -n "${ANYPOINT_CLIENT_ID}"
           test -n "${ANYPOINT_CLIENT_SECRET}"
-          test -n "${NEXUS_USERNAME}"
-          test -n "${NEXUS_PASSWORD}"
           test -n "${SECURE_KEY}"
           test -n "${ANYPOINT_ORG_ID}"
           test -n "${ANYPOINT_ENVIRONMENT}"
@@ -85,6 +81,7 @@ jobs:
       - name: Display deployment configuration
         shell: bash
         run: |
+          echo "Organization ID: ${ANYPOINT_ORG_ID}"
           echo "Environment: ${ANYPOINT_ENVIRONMENT}"
           echo "Target: ${CLOUDHUB_TARGET}"
           echo "Application: ${APPLICATION_NAME}"
@@ -93,8 +90,10 @@ jobs:
       - name: Verify secret files are not tracked
         shell: bash
         run: |
-          if git ls-files | grep -E 'local-secrets\.properties|secure\.properties'; then
-            echo "A secret properties file is tracked by Git."
+          TRACKED_SECRET_FILES=$(git ls-files | grep -E '(^|/)local-secrets\.properties$|(^|/)secure\.properties$' || true)
+          if [ -n "${TRACKED_SECRET_FILES}" ]; then
+            echo "Secret properties files are tracked by Git:"
+            echo "${TRACKED_SECRET_FILES}"
             exit 1
           fi
           echo "No secret properties files are tracked."
@@ -102,14 +101,18 @@ jobs:
       - name: Validate Maven settings
         shell: bash
         run: >-
-          mvn --batch-mode --errors
+          mvn
+          --batch-mode
+          --errors
           --settings .maven/settings.xml
           help:effective-settings
 
       - name: Run MUnit tests and package
         shell: bash
         run: >-
-          mvn --batch-mode --errors
+          mvn
+          --batch-mode
+          --errors
           --settings .maven/settings.xml
           clean package
           -Dsecure.key="${SECURE_KEY}"
@@ -129,7 +132,9 @@ jobs:
       - name: Publish and deploy to CloudHub 2.0
         shell: bash
         run: >-
-          mvn --batch-mode --errors
+          mvn
+          --batch-mode
+          --errors
           --settings .maven/settings.xml
           clean deploy
           -DmuleDeploy
