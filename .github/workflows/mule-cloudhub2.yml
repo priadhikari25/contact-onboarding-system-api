@@ -165,7 +165,7 @@ jobs:
 
           echo "Mule application artifact created successfully."
 
-      - name: Publish and deploy to CloudHub 2.0
+           - name: Publish application version to Anypoint Exchange
         shell: bash
         run: >-
           mvn
@@ -173,10 +173,21 @@ jobs:
           --errors
           --settings .maven/settings.xml
           clean deploy
-          -DmuleDeploy
+          -DskipMunitTests
+          -Dsecure.key="${SECURE_KEY}"
+
+      - name: Deploy published application to CloudHub 2.0
+        shell: bash
+        run: >-
+          mvn
+          --batch-mode
+          --errors
+          --settings .maven/settings.xml
+          mule:deploy
           -DskipMunitTests
           -Danypoint.clientId="${ANYPOINT_CLIENT_ID}"
           -Danypoint.clientSecret="${ANYPOINT_CLIENT_SECRET}"
+          -Danypoint.orgId="${ANYPOINT_ORG_ID}"
           -Danypoint.environment="${ANYPOINT_ENVIRONMENT}"
           -Dcloudhub.target="${CLOUDHUB_TARGET}"
           -Dcloudhub.application.name="${APPLICATION_NAME}"
@@ -187,7 +198,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: contact-onboarding-system-api
+          name: contact-onboarding-system-api-1.0.1
           path: target/*-mule-application.jar
           if-no-files-found: warn
 
@@ -196,4 +207,5 @@ jobs:
         shell: bash
         run: |
           rm -f src/main/resources/secure/secure.properties
+          echo "Generated secure properties file removed from the GitHub runner."
           echo "Generated secure properties file removed from the GitHub runner."
