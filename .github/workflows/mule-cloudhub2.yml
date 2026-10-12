@@ -14,8 +14,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  test-publish-deploy:
-    runs-on: ubuntu-latest
+  test-and-deploy:
+    runs-on: ubuntu-24.04
 
     env:
       ANYPOINT_CLIENT_ID: ${{ secrets.ANYPOINT_CLIENT_ID }}
@@ -31,19 +31,14 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Java 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "17"
           cache: maven
-
-      - name: Set up Maven 3.9.9
-        uses: stCarolas/setup-maven@v5
-        with:
-          maven-version: "3.9.9"
 
       - name: Display build environment
         shell: bash
@@ -172,18 +167,7 @@ jobs:
           echo "Mule application artifact created successfully."
           ls -la "${ARTIFACT_PATH}"
 
-      - name: Publish application version to Anypoint Exchange
-        shell: bash
-        run: >-
-          mvn
-          --batch-mode
-          --errors
-          --settings .maven/settings.xml
-          clean deploy
-          -DskipMunitTests
-          -Dsecure.key="${SECURE_KEY}"
-
-      - name: Deploy published application to CloudHub 2.0
+      - name: Deploy Exchange application to CloudHub 2.0
         shell: bash
         run: >-
           mvn
@@ -203,7 +187,7 @@ jobs:
 
       - name: Upload Mule application artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: contact-onboarding-system-api-1.0.1
           path: target/contact-onboarding-system-api-1.0.1-mule-application.jar
