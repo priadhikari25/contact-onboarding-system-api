@@ -44,6 +44,13 @@ jobs:
 
       - name: Validate required configuration
         shell: bash
+        env:
+          SECURE_KEY: ${{ secrets.SECURE_KEY }}
+          ANYPOINT_ORG_ID: ${{ vars.ANYPOINT_ORG_ID }}
+          ANYPOINT_ENVIRONMENT: ${{ vars.ANYPOINT_ENVIRONMENT }}
+          CLOUDHUB_TARGET: ${{ vars.CLOUDHUB_TARGET }}
+          APPLICATION_NAME: ${{ vars.APPLICATION_NAME }}
+          MULE_VERSION: ${{ vars.MULE_VERSION }}
         run: |
           test -f pom.xml
           test -f mule-artifact.json
@@ -51,16 +58,12 @@ jobs:
           test -n "${ANYPOINT_CLIENT_ID}"
           test -n "${ANYPOINT_CLIENT_SECRET}"
           test -n "${SECURE_KEY}"
+          test -n "${ANYPOINT_ORG_ID}"
           test -n "${ANYPOINT_ENVIRONMENT}"
           test -n "${CLOUDHUB_TARGET}"
           test -n "${APPLICATION_NAME}"
           test -n "${MULE_VERSION}"
-        env:
-          SECURE_KEY: ${{ secrets.SECURE_KEY }}
-          ANYPOINT_ENVIRONMENT: ${{ vars.ANYPOINT_ENVIRONMENT }}
-          CLOUDHUB_TARGET: ${{ vars.CLOUDHUB_TARGET }}
-          APPLICATION_NAME: ${{ vars.APPLICATION_NAME }}
-          MULE_VERSION: ${{ vars.MULE_VERSION }}
+          echo "Required deployment configuration is available."
 
       - name: Validate Maven settings
         run: |
