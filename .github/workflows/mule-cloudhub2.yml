@@ -16,15 +16,19 @@ concurrency:
 jobs:
   test-and-deploy:
     runs-on: ubuntu-latest
+
     env:
       ANYPOINT_CLIENT_ID: ${{ secrets.ANYPOINT_CLIENT_ID }}
       ANYPOINT_CLIENT_SECRET: ${{ secrets.ANYPOINT_CLIENT_SECRET }}
       SECURE_KEY: ${{ secrets.SECURE_KEY }}
+      SECURE_PROPERTIES_FILE: ${{ secrets.SECURE_PROPERTIES_FILE }}
+
       ANYPOINT_ORG_ID: ${{ vars.ANYPOINT_ORG_ID }}
       ANYPOINT_ENVIRONMENT: ${{ vars.ANYPOINT_ENVIRONMENT }}
       CLOUDHUB_TARGET: ${{ vars.CLOUDHUB_TARGET }}
       APPLICATION_NAME: ${{ vars.APPLICATION_NAME }}
       MULE_VERSION: ${{ vars.MULE_VERSION }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -53,6 +57,7 @@ jobs:
           test -f pom.xml
           test -f mule-artifact.json
           test -f .maven/settings.xml
+
           echo "Required project files are present."
 
       - name: Validate required secrets and variables
@@ -61,11 +66,14 @@ jobs:
           test -n "${ANYPOINT_CLIENT_ID}"
           test -n "${ANYPOINT_CLIENT_SECRET}"
           test -n "${SECURE_KEY}"
+          test -n "${SECURE_PROPERTIES_FILE}"
+
           test -n "${ANYPOINT_ORG_ID}"
           test -n "${ANYPOINT_ENVIRONMENT}"
           test -n "${CLOUDHUB_TARGET}"
           test -n "${APPLICATION_NAME}"
           test -n "${MULE_VERSION}"
+
           echo "Required GitHub secrets and variables are available."
 
       - name: Validate CloudHub target
@@ -76,6 +84,7 @@ jobs:
             echo "Expected value: Cloudhub-US-East-2"
             exit 1
           fi
+
           echo "CloudHub target is valid: ${CLOUDHUB_TARGET}"
 
       - name: Display deployment configuration
@@ -91,12 +100,36 @@ jobs:
         shell: bash
         run: |
           TRACKED_SECRET_FILES=$(git ls-files | grep -E '(^|/)local-secrets\.properties$|(^|/)secure\.properties$' || true)
+
           if [ -n "${TRACKED_SECRET_FILES}" ]; then
             echo "Secret properties files are tracked by Git:"
             echo "${TRACKED_SECRET_FILES}"
             exit 1
           fi
+
           echo "No secret properties files are tracked."
+
+      - name: Create secure properties file
+        shell: bash
+        run: |
+          mkdir -p src/main/resources/secure
+
+          printf '%s\n' "${SECURE_PROPERTIES_FILE}" > src/main/resources/secure/secure.properties
+
+          if [ ! -s src/main/resources/secure/secure.properties ]; then
+            echo "Generated secure.properties file is empty."
+            exit 1
+          fi
+
+          PROPERTY_COUNT=$(grep -c '=' src/main/resources/secure/secure.properties || true)
+
+          if [ "${PROPERTY_COUNT}" -eq 0 ]; then
+            echo "Generated secure.properties file contains no properties."
+            exit 1
+          fi
+
+          echo "Secure properties file created successfully."
+          echo "Property count: ${PROPERTY_COUNT}"
 
       - name: Validate Maven settings
         shell: bash
@@ -122,11 +155,14 @@ jobs:
         shell: bash
         run: |
           ls -la target
+
           ARTIFACT_COUNT=$(find target -maxdepth 1 -type f -name '*-mule-application.jar' | wc -l)
+
           if [ "${ARTIFACT_COUNT}" -eq 0 ]; then
             echo "No Mule application JAR was created."
             exit 1
           fi
+
           echo "Mule application artifact created successfully."
 
       - name: Publish and deploy to CloudHub 2.0
@@ -154,3 +190,10 @@ jobs:
           name: contact-onboarding-system-api
           path: target/*-mule-application.jar
           if-no-files-found: warn
+
+      - name: Remove generated secure properties file
+        if: always()
+        shell: bash
+        run: |
+          rm -f src/main/resources/secure/secure.properties
+          echo "Generated secure properties file removed from the GitHub runner."
