@@ -51,3 +51,4 @@ src/main/resources/local-secrets.properties
 src/main/resources/local-secrets.properties
 .mule/
 *.backup
+src/main/resources/secure/secure.properties
